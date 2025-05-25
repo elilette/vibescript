@@ -1,10 +1,18 @@
 import React from "react"
-import { View, Text, StyleSheet, ScrollView } from "react-native"
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import GradientBackground from "../components/GradientBackground"
 import { useApp } from "../context/AppContext"
+import { useAuth } from "../context/AuthContext"
 import { Achievement, PersonalityVibe } from "../types"
 
 const mockAchievements: Achievement[] = [
@@ -52,6 +60,28 @@ const mockPersonalityVibe: PersonalityVibe = {
 
 export default function ProfileScreen() {
   const { user } = useApp()
+  const { signOut } = useAuth()
+
+  const handleSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut()
+          } catch (error) {
+            console.error("Error signing out:", error)
+            Alert.alert("Error", "Failed to sign out. Please try again.")
+          }
+        },
+      },
+    ])
+  }
 
   if (!user) {
     return (
@@ -222,6 +252,17 @@ export default function ProfileScreen() {
                 </View>
               ))}
             </View>
+          </View>
+
+          {/* Sign Out Button */}
+          <View style={styles.signOutSection}>
+            <TouchableOpacity
+              style={styles.signOutButton}
+              onPress={handleSignOut}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -394,5 +435,24 @@ const styles = StyleSheet.create({
   },
   lockedText: {
     color: "rgba(255, 255, 255, 0.5)",
+  },
+  signOutSection: {
+    alignItems: "center",
+    marginTop: 30,
+  },
+  signOutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  signOutText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#ffffff",
+    marginLeft: 10,
   },
 })

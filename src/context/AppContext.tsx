@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react"
 import { User, Analysis, JournalEntry, Achievement } from "../types"
-// Temporarily comment out Supabase for development to avoid bundling issues
-// import { supabase } from "../services/supabase"
+import { supabase } from "../services/supabase"
+import { useAuth } from "./AuthContext"
 
 interface AppState {
   user: User | null
@@ -65,6 +65,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(appReducer, initialState)
+  const { user: authUser, session } = useAuth()
 
   const setUser = (user: User | null) => {
     dispatch({ type: "SET_USER", payload: user })
@@ -80,31 +81,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchUserData = async () => {
     try {
-      // Use mock data for development - replace with real Supabase when ready
-      const mockUser: User = {
-        id: "demo-user-123",
-        email: "alex@vibescript.app",
-        name: "Alex Johnson",
-        created_at: "2024-03-01",
-        total_analyses: 24,
-        current_streak: 12,
-        average_score: 87,
+      dispatch({ type: "SET_LOADING", payload: true })
+
+      if (!authUser || !session) {
+        // No authenticated user, clear data
+        setUser(null)
+        dispatch({ type: "SET_ANALYSES", payload: [] })
+        dispatch({ type: "SET_JOURNAL_ENTRIES", payload: [] })
+        dispatch({ type: "SET_ACHIEVEMENTS", payload: [] })
+        dispatch({ type: "SET_LOADING", payload: false })
+        return
       }
 
-      // Reduced loading delay to work with splash screen
-      setTimeout(() => {
-        setUser(mockUser)
-        dispatch({ type: "SET_LOADING", payload: false })
-      }, 100)
+      // Create or get user profile from Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authUser.id)
+        .single()
+
+      if (profileError && profileError.code !== "PGRST116") {
+        // PGRST116 is "not found" error, which is expected for new users
+        console.error("Error fetching user profile:", profileError)
+      }
+
+      let userProfile: User
+      if (!profile) {
+        // Create new user profile
+        const newProfile = {
+          id: authUser.id,
+          email: authUser.email || "",
+          name:
+            authUser.user_metadata?.full_name ||
+            authUser.email?.split("@")[0] ||
+            "User",
+          created_at: new Date().toISOString(),
+          total_analyses: 0,
+          current_streak: 0,
+          average_score: 0,
+        }
+
+        const { data: createdProfile, error: createError } = await supabase
+          .from("profiles")
+          .insert([newProfile])
+          .select()
+          .single()
+
+        if (createError) {
+          console.error("Error creating user profile:", createError)
+          // Use a fallback profile
+          userProfile = newProfile
+        } else {
+          userProfile = createdProfile
+        }
+      } else {
+        userProfile = profile
+      }
+
+      setUser(userProfile)
+
+      // Fetch user's analyses, journal entries, and achievements
+      // For now, we'll use empty arrays as the database schema might not be set up yet
+      dispatch({ type: "SET_ANALYSES", payload: [] })
+      dispatch({ type: "SET_JOURNAL_ENTRIES", payload: [] })
+      dispatch({ type: "SET_ACHIEVEMENTS", payload: [] })
     } catch (error) {
       console.error("Error fetching user data:", error)
+    } finally {
       dispatch({ type: "SET_LOADING", payload: false })
     }
   }
 
   useEffect(() => {
     fetchUserData()
-  }, [])
+  }, [authUser, session])
 
   const value = {
     ...state,

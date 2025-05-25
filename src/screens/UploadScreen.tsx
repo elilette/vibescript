@@ -12,13 +12,79 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import * as DocumentPicker from "expo-document-picker"
+import * as FileSystem from "expo-file-system"
 import GradientBackground from "../components/GradientBackground"
-import { photoAnalysisService } from "../services/photoAnalysis"
+import { PhotoAnalysisResponse } from "../types/analysis"
 
 export default function UploadScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
+
+  // Moved from photoAnalysis.ts - Convert image to base64
+  const convertImageToBase64 = async (imageUri: string): Promise<string> => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      })
+      return base64
+    } catch (error) {
+      console.error("Error converting image to base64:", error)
+      throw new Error("Failed to process image")
+    }
+  }
+
+  // Moved from photoAnalysis.ts - Call Edge Function
+  const analyzePhoto = async (
+    imageBase64: string,
+    customPrompt?: string
+  ): Promise<PhotoAnalysisResponse> => {
+    try {
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return {
+          success: false,
+          error: "Supabase configuration missing",
+        }
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/analyze-photo`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageBase64,
+            prompt: customPrompt,
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Edge function error:", errorText)
+        return {
+          success: false,
+          error: `Function call failed: ${response.status}`,
+        }
+      }
+
+      const result = await response.json()
+      return result as PhotoAnalysisResponse
+    } catch (error) {
+      console.error("Error calling analyze-photo function:", error)
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      }
+    }
+  }
 
   const requestCameraPermissions = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
@@ -78,7 +144,7 @@ export default function UploadScreen() {
     }
   }
 
-  const analyzePhoto = async () => {
+  const handleAnalyzePhoto = async () => {
     if (!selectedImage) {
       Alert.alert("No image selected", "Please select an image first")
       return
@@ -88,28 +154,14 @@ export default function UploadScreen() {
 
     try {
       // Convert image to base64
-      const base64Image = await photoAnalysisService.convertImageToBase64(
-        selectedImage
-      )
+      const base64Image = await convertImageToBase64(selectedImage)
 
       // Analyze the photo using our edge function
-      const result = await photoAnalysisService.analyzePhoto(base64Image)
+      const result = await analyzePhoto(base64Image)
 
-      if (result.success && result.analysis) {
-        // Handle structured or string analysis
-        let formattedAnalysis: string
-
-        if (typeof result.analysis === "object") {
-          // Use the formatted display for structured analysis
-          formattedAnalysis = photoAnalysisService.formatAnalysisForDisplay(
-            result.analysis
-          )
-        } else {
-          // Fallback to raw string analysis
-          formattedAnalysis = result.analysis
-        }
-
-        setAnalysisResult(formattedAnalysis)
+      if (result.success && result.formatted_analysis) {
+        // Use the pre-formatted analysis from the server
+        setAnalysisResult(result.formatted_analysis)
         Alert.alert(
           "Analysis Complete! 🎉",
           "Your handwriting has been analyzed using advanced AI graphology techniques by Dr. Sarah Mitchell!",
@@ -196,7 +248,7 @@ export default function UploadScreen() {
                 styles.analyzeButton,
                 isAnalyzing && styles.analyzingButton,
               ]}
-              onPress={analyzePhoto}
+              onPress={handleAnalyzePhoto}
               disabled={isAnalyzing}
             >
               <Text style={styles.analyzeButtonText}>
