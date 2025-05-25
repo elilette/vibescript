@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from "./src/context/AuthContext"
 
 const AppContent = () => {
   const [isReady, setIsReady] = useState(false)
-  const { session, loading } = useAuth()
+  const { session, loading, authenticating, signingOut } = useAuth()
 
   const handleSplashFinish = () => {
     setIsReady(true)
@@ -24,8 +24,18 @@ const AppContent = () => {
     )
   }
 
-  // Show login screen if not authenticated
-  if (!loading && !session) {
+  // Show loading screen if signing out
+  if (signingOut) {
+    return (
+      <>
+        <StatusBar style="light" backgroundColor="transparent" translucent />
+        <LoginScreen />
+      </>
+    )
+  }
+
+  // Show login screen if not authenticated OR if authenticating
+  if ((!loading && !session) || authenticating) {
     return (
       <>
         <StatusBar style="light" backgroundColor="transparent" translucent />

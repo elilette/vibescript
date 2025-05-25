@@ -1,18 +1,18 @@
-import React from "react"
+import React, { useState, useEffect } from "react"
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  Image,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import GradientBackground from "../components/GradientBackground"
-import { useApp } from "../context/AppContext"
 import { useAuth } from "../context/AuthContext"
+import { profileService, ProfileData } from "../services/profileService"
 import { Achievement, PersonalityVibe } from "../types"
 
 const mockAchievements: Achievement[] = [
@@ -59,31 +59,31 @@ const mockPersonalityVibe: PersonalityVibe = {
 }
 
 export default function ProfileScreen() {
-  const { user } = useApp()
-  const { signOut } = useAuth()
+  const { user } = useAuth()
+  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [imageError, setImageError] = useState(false)
 
-  const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await signOut()
-          } catch (error) {
-            console.error("Error signing out:", error)
-            Alert.alert("Error", "Failed to sign out. Please try again.")
-          }
-        },
-      },
-    ])
+  useEffect(() => {
+    if (user) {
+      fetchProfileData()
+    }
+  }, [user])
+
+  const fetchProfileData = async () => {
+    try {
+      if (!user) return
+
+      const profile = await profileService.getOrCreateProfile(user)
+      setProfileData(profile)
+    } catch (error) {
+      console.error("Error fetching profile data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (!user) {
+  if (!user || loading) {
     return (
       <GradientBackground>
         <SafeAreaView style={styles.container}>
@@ -95,6 +95,16 @@ export default function ProfileScreen() {
     )
   }
 
+  // Extract user data from Supabase Auth
+  const displayName =
+    user.user_metadata?.full_name || user.email?.split("@")[0] || "User"
+  const avatarUrl = user.user_metadata?.avatar_url
+  const email = user.email
+  const createdAt = new Date(user.created_at).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
+
   return (
     <GradientBackground>
       <SafeAreaView style={styles.container}>
@@ -102,33 +112,47 @@ export default function ProfileScreen() {
           {/* User Header */}
           <View style={styles.userHeader}>
             <View style={styles.avatarContainer}>
-              <LinearGradient
-                colors={["#EC4899", "#8B5CF6", "#3B82F6"]}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>
-                  {user.name.charAt(0).toUpperCase()}
-                </Text>
-              </LinearGradient>
+              {avatarUrl && !imageError ? (
+                <Image
+                  source={{ uri: avatarUrl }}
+                  style={styles.avatar}
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <LinearGradient
+                  colors={["#EC4899", "#8B5CF6", "#3B82F6"]}
+                  style={styles.avatar}
+                >
+                  <Text style={styles.avatarText}>
+                    {displayName.charAt(0).toUpperCase()}
+                  </Text>
+                </LinearGradient>
+              )}
             </View>
-            <Text style={styles.userName}>{user.name}</Text>
+            <Text style={styles.userName}>{displayName}</Text>
             <Text style={styles.userSubtitle}>
-              VibeScript Explorer since March 2024
+              VibeScript Explorer since {createdAt}
             </Text>
           </View>
 
           {/* Stats Cards */}
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{user.total_analyses}</Text>
+              <Text style={styles.statNumber}>
+                {profileData?.total_analyses || 0}
+              </Text>
               <Text style={styles.statLabel}>Analyses</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{user.current_streak}</Text>
+              <Text style={styles.statNumber}>
+                {profileData?.current_streak || 0}
+              </Text>
               <Text style={styles.statLabel}>Day Streak</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{user.average_score}%</Text>
+              <Text style={styles.statNumber}>
+                {profileData?.average_score || 0}%
+              </Text>
               <Text style={styles.statLabel}>Avg Score</Text>
             </View>
           </View>
@@ -253,17 +277,6 @@ export default function ProfileScreen() {
               ))}
             </View>
           </View>
-
-          {/* Sign Out Button */}
-          <View style={styles.signOutSection}>
-            <TouchableOpacity
-              style={styles.signOutButton}
-              onPress={handleSignOut}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </SafeAreaView>
     </GradientBackground>
@@ -301,9 +314,11 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#ffffff",
   },
@@ -435,24 +450,5 @@ const styles = StyleSheet.create({
   },
   lockedText: {
     color: "rgba(255, 255, 255, 0.5)",
-  },
-  signOutSection: {
-    alignItems: "center",
-    marginTop: 30,
-  },
-  signOutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 15,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  signOutText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginLeft: 10,
   },
 })

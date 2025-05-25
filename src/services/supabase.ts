@@ -21,11 +21,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    flowType: 'pkce', // More secure flow for mobile apps
+    flowType: "pkce", // More secure flow for mobile apps
   },
   global: {
     headers: {
-      'X-Client-Info': 'vibe-script-mobile',
+      "X-Client-Info": "vibe-script-mobile",
     },
   },
 })

@@ -11,8 +11,8 @@ config.resolver = {
     stream: "readable-stream",
     url: "react-native-url-polyfill",
   },
-  // Ignore problematic WebSocket modules that cause bundling issues
-  blockList: [/node_modules\/ws\/.*/],
+  // Disable package exports to fix Supabase WebSocket issues
+  unstable_enablePackageExports: false,
 }
 
 module.exports = config

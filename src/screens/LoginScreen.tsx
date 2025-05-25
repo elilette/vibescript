@@ -10,15 +10,17 @@ import {
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@expo/vector-icons"
+import Octicons from "@expo/vector-icons/Octicons"
 import { useAuth } from "../context/AuthContext"
 
 const LoginScreen: React.FC = () => {
-  const { signInWithApple, loading } = useAuth()
-  const [isSigningIn, setIsSigningIn] = useState(false)
+  const { signInWithApple, signInWithGoogle, loading } = useAuth()
+  const [isSigningInApple, setIsSigningInApple] = useState(false)
+  const [isSigningInGoogle, setIsSigningInGoogle] = useState(false)
 
   const handleAppleSignIn = async () => {
     try {
-      setIsSigningIn(true)
+      setIsSigningInApple(true)
       await signInWithApple()
     } catch (error) {
       console.error("Apple Sign In Error:", error)
@@ -28,7 +30,23 @@ const LoginScreen: React.FC = () => {
         [{ text: "OK" }]
       )
     } finally {
-      setIsSigningIn(false)
+      setIsSigningInApple(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsSigningInGoogle(true)
+      await signInWithGoogle()
+    } catch (error) {
+      console.error("Google Sign In Error:", error)
+      Alert.alert(
+        "Sign In Error",
+        "There was an error signing in with Google. Please try again.",
+        [{ text: "OK" }]
+      )
+    } finally {
+      setIsSigningInGoogle(false)
     }
   }
 
@@ -51,13 +69,7 @@ const LoginScreen: React.FC = () => {
         <View style={styles.content}>
           {/* Logo/Brand Section */}
           <View style={styles.brandSection}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="create-outline" size={80} color="#FFFFFF" />
-            </View>
-            <Text style={styles.brandTitle}>VibeScript</Text>
-            <Text style={styles.brandSubtitle}>
-              Discover your personality through handwriting analysis
-            </Text>
+            <Octicons name="pencil" size={60} color="#FFFFFF" />
           </View>
 
           {/* Sign In Section */}
@@ -69,17 +81,42 @@ const LoginScreen: React.FC = () => {
             </Text>
 
             <TouchableOpacity
-              style={[styles.appleButton, isSigningIn && styles.buttonDisabled]}
+              style={[
+                styles.appleButton,
+                (isSigningInApple || isSigningInGoogle) &&
+                  styles.buttonDisabled,
+              ]}
               onPress={handleAppleSignIn}
-              disabled={isSigningIn}
+              disabled={isSigningInApple || isSigningInGoogle}
             >
-              {isSigningIn ? (
+              {isSigningInApple ? (
                 <ActivityIndicator size="small" color="#000000" />
               ) : (
                 <>
                   <Ionicons name="logo-apple" size={24} color="#000000" />
                   <Text style={styles.appleButtonText}>
                     Continue with Apple
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.googleButton,
+                (isSigningInApple || isSigningInGoogle) &&
+                  styles.buttonDisabled,
+              ]}
+              onPress={handleGoogleSignIn}
+              disabled={isSigningInApple || isSigningInGoogle}
+            >
+              {isSigningInGoogle ? (
+                <ActivityIndicator size="small" color="#000000" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={24} color="#000000" />
+                  <Text style={styles.googleButtonText}>
+                    Continue with Google
                   </Text>
                 </>
               )}
@@ -106,7 +143,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: "space-between",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,
@@ -120,50 +158,28 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   brandSection: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 60,
-  },
-  logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  brandTitle: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 8,
-  },
-  brandSubtitle: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
-    lineHeight: 22,
-    paddingHorizontal: 20,
+    marginBottom: 50,
   },
   signInSection: {
-    paddingBottom: 40,
+    width: "100%",
+    paddingBottom: 20,
   },
   welcomeText: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#FFFFFF",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   descriptionText: {
     fontSize: 16,
     color: "rgba(255, 255, 255, 0.8)",
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 32,
-    paddingHorizontal: 20,
+    marginBottom: 24,
+    paddingHorizontal: 10,
   },
   appleButton: {
     backgroundColor: "#FFFFFF",
@@ -173,7 +189,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -193,11 +209,36 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   termsText: {
-    fontSize: 12,
+    fontSize: 11,
     color: "rgba(255, 255, 255, 0.6)",
     textAlign: "center",
-    lineHeight: 16,
-    paddingHorizontal: 20,
+    lineHeight: 14,
+    paddingHorizontal: 10,
+    marginTop: 8,
+  },
+  googleButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  googleButtonText: {
+    color: "#000000",
+    fontSize: 18,
+    fontWeight: "600",
+    marginLeft: 12,
   },
 })
 

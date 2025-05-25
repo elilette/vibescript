@@ -5,14 +5,36 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import GradientBackground from "../components/GradientBackground"
-import { useApp } from "../context/AppContext"
+import { useAuth } from "../context/AuthContext"
 
 export default function SettingsScreen() {
-  const { user } = useApp()
+  const { user, signOut } = useAuth()
+
+  const handleSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut()
+          } catch (error) {
+            console.error("Error signing out:", error)
+            Alert.alert("Error", "Failed to sign out. Please try again.")
+          }
+        },
+      },
+    ])
+  }
 
   if (!user) {
     return (
@@ -70,7 +92,10 @@ export default function SettingsScreen() {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={handleSignOut}
+            >
               <View style={styles.settingLeft}>
                 <Ionicons name="log-out" size={20} color="#EF4444" />
                 <Text style={[styles.settingLabel, { color: "#EF4444" }]}>
