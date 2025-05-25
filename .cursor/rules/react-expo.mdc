@@ -1,0 +1,16 @@
+---
+description: 
+globs: *tsx
+alwaysApply: false
+---
+When working with React Expo components:
+
+- Use functional components with TypeScript
+- Follow structure: imports → interfaces → component → styles → export
+- Use React.memo() for performance when needed
+- Handle loading and error states
+- Use FlatList for large lists
+- Implement accessibility labels
+- Prefer Expo built-in components
+
+@component-template.tsx

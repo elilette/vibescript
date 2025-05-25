@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Supabase Data API
+
+## Mandatory API Usage
+- **ALWAYS** use Supabase client for database operations
+- **NEVER** bypass with direct database connections
+- Generate TypeScript types: `supabase gen types typescript --linked --schema=public > types/database.types.ts`
+- Leverage RLS policies for automatic security
+
+## CRUD Pattern with Types
+```typescript
+import { Database } from '@/types/database.types';
+type Tables = Database['public']['Tables'];
+type Profile = Tables['profiles']['Row'];
+
+// Always use proper typing and error handling
+const { data, error } = await supabase
+  .from('profiles')
+  .select('*')
+  .returns<Profile[]>();
+
+if (error) {
+  // Handle error appropriately
+}
+```
+
+## Query Optimization
+- Use select() to specify only needed columns
+- Implement pagination with range() for large datasets
+- Use filters to reduce data transfer
+- Use single() for single record operations
+- Leverage Supabase's built-in caching
+
+## Error Handling Standards
+- Always handle Supabase errors gracefully
+- Provide user-friendly error messages
+- Implement retry logic for network errors
+- Log errors for debugging purposes

@@ -1,0 +1,28 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Supabase Database - Declarative Schema
+
+## Workflow Rules
+1. **NEVER** edit `supabase/migrations/` directly
+2. Define all schema in `supabase/schemas/*.sql` files
+3. Generate migrations: `supabase stop && supabase db diff -f migration_name`
+4. Review generated migration before applying
+
+## Schema Organization
+- One file per entity (table, view, function)
+- Use numbered prefixes: `01_users.sql`, `02_profiles.sql`
+- Include comprehensive comments
+- Use snake_case naming conventions
+- Add new columns at end to prevent unnecessary diffs
+
+## RLS Requirements
+- **MANDATORY**: Enable RLS on ALL tables
+- Create separate policies for each operation (SELECT, INSERT, UPDATE, DELETE)
+- Create separate policies for each role (anon, authenticated)
+- Use auth.uid() for user-specific data access
+- Document policy rationale in comments
+
+@schema-template.sql
