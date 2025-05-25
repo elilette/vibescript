@@ -1,12 +1,12 @@
 export interface User {
   id: string
+  user_id: string
   email: string
-  name: string
-  avatar_url?: string
+  full_name: string | null
+  bio: string | null
+  avatar_url: string | null
   created_at: string
-  total_analyses: number
-  current_streak: number
-  average_score: number
+  updated_at: string
 }
 
 export interface PersonalityTrait {
@@ -49,15 +49,6 @@ export interface PersonalityVibe {
   creativity: number
   confidence: number
   focus: number
-}
-
-export type RootStackParamList = {
-  Main: undefined
-  Profile: undefined
-  Upload: undefined
-  Analysis: { analysisId: string }
-  Journal: undefined
-  Settings: undefined
 }
 
 export type TabParamList = {

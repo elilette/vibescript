@@ -6,7 +6,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "generate-types": "supabase gen types typescript --local > src/types/database.generated.ts",
+    "generate-edge-types": "node scripts/generate-edge-types.js",
+    "generate-all-types": "npm run generate-types && npm run generate-edge-types",
+    "dev": "npm run generate-all-types && expo start"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.2",

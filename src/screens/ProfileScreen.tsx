@@ -12,7 +12,6 @@ import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import GradientBackground from "../components/GradientBackground"
 import { useAuth } from "../context/AuthContext"
-import { profileService, ProfileData } from "../services/profileService"
 import { Achievement, PersonalityVibe } from "../types"
 
 const mockAchievements: Achievement[] = [
@@ -60,28 +59,15 @@ const mockPersonalityVibe: PersonalityVibe = {
 
 export default function ProfileScreen() {
   const { user } = useAuth()
-  const [profileData, setProfileData] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
     if (user) {
-      fetchProfileData()
-    }
-  }, [user])
-
-  const fetchProfileData = async () => {
-    try {
-      if (!user) return
-
-      const profile = await profileService.getOrCreateProfile(user)
-      setProfileData(profile)
-    } catch (error) {
-      console.error("Error fetching profile data:", error)
-    } finally {
+      // For now, just set loading to false since we're using mock data
       setLoading(false)
     }
-  }
+  }, [user])
 
   if (!user || loading) {
     return (
@@ -138,21 +124,15 @@ export default function ProfileScreen() {
           {/* Stats Cards */}
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {profileData?.total_analyses || 0}
-              </Text>
+              <Text style={styles.statNumber}>12</Text>
               <Text style={styles.statLabel}>Analyses</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {profileData?.current_streak || 0}
-              </Text>
+              <Text style={styles.statNumber}>7</Text>
               <Text style={styles.statLabel}>Day Streak</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {profileData?.average_score || 0}%
-              </Text>
+              <Text style={styles.statNumber}>85%</Text>
               <Text style={styles.statLabel}>Avg Score</Text>
             </View>
           </View>
