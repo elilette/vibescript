@@ -14,12 +14,14 @@ import * as ImagePicker from "expo-image-picker"
 import * as DocumentPicker from "expo-document-picker"
 import * as FileSystem from "expo-file-system"
 import GradientBackground from "../components/GradientBackground"
-import { PhotoAnalysisResponse } from "../types/analysis"
+import { EnhancedAnalysisResponse } from "../types/analysis"
+import { useAuth } from "../context/AuthContext"
 
 export default function UploadScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
+  const { session } = useAuth()
 
   // Moved from photoAnalysis.ts - Convert image to base64
   const convertImageToBase64 = async (imageUri: string): Promise<string> => {
@@ -38,24 +40,30 @@ export default function UploadScreen() {
   const analyzePhoto = async (
     imageBase64: string,
     customPrompt?: string
-  ): Promise<PhotoAnalysisResponse> => {
+  ): Promise<EnhancedAnalysisResponse> => {
     try {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
-      if (!supabaseUrl || !supabaseAnonKey) {
+      if (!supabaseUrl) {
         return {
           success: false,
           error: "Supabase configuration missing",
         }
       }
 
+      if (!session?.access_token) {
+        return {
+          success: false,
+          error: "User not authenticated",
+        }
+      }
+
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/analyze-photo`,
+        `${supabaseUrl}/functions/v1/analyze-handwriting-enhanced`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${supabaseAnonKey}`,
+            Authorization: `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -75,9 +83,12 @@ export default function UploadScreen() {
       }
 
       const result = await response.json()
-      return result as PhotoAnalysisResponse
+      return result as EnhancedAnalysisResponse
     } catch (error) {
-      console.error("Error calling analyze-photo function:", error)
+      console.error(
+        "Error calling analyze-handwriting-enhanced function:",
+        error
+      )
       return {
         success: false,
         error:
@@ -150,6 +161,14 @@ export default function UploadScreen() {
       return
     }
 
+    if (!session?.access_token) {
+      Alert.alert(
+        "Authentication Required",
+        "Please sign in to analyze your handwriting"
+      )
+      return
+    }
+
     setIsAnalyzing(true)
 
     try {
@@ -163,14 +182,18 @@ export default function UploadScreen() {
         // Use the pre-formatted analysis from the server
         setAnalysisResult(result.formatted_analysis)
         Alert.alert(
-          "Analysis Complete! 🎉",
-          "Your handwriting has been analyzed using advanced AI graphology techniques by Dr. Sarah Mitchell!",
+          "Enhanced Analysis Complete! 🎉",
+          `Your handwriting has been analyzed with advanced AI graphology techniques!\n\n📊 Confidence Score: ${Math.round(
+            (result.confidence_score || 0) * 100
+          )}%\n🎯 Overall Score: ${Math.round(
+            (result.overall_score || 0) * 100
+          )}%\n\nView your quantified personality traits and detailed insights below!`,
           [
             {
               text: "View Results",
               onPress: () => {
                 // Analysis is already set in state and will be displayed
-                console.log("Analysis results:", result.analysis)
+                console.log("Enhanced analysis results:", result.analysis)
               },
             },
           ]
