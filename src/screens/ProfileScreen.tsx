@@ -112,58 +112,100 @@ export default function ProfileScreen() {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content}>
-          {/* User Header */}
-          <View style={styles.userHeader}>
-            <View style={styles.avatarContainer}>
-              {avatarUrl && !imageError ? (
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={styles.avatar}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <LinearGradient
-                  colors={["#EC4899", "#8B5CF6", "#3B82F6"]}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {displayName.charAt(0).toUpperCase()}
-                  </Text>
-                </LinearGradient>
-              )}
+          {/* User Header with Cover */}
+          <View style={styles.profileCover}>
+            <LinearGradient
+              colors={[
+                "rgba(236, 72, 153, 0.8)",
+                "rgba(139, 92, 246, 0.8)",
+                "rgba(59, 130, 246, 0.8)",
+              ]}
+              style={styles.coverGradient}
+            />
+            <View style={styles.userHeader}>
+              <View style={styles.avatarContainer}>
+                {avatarUrl && !imageError ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatar}
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <LinearGradient
+                    colors={["#EC4899", "#8B5CF6", "#3B82F6"]}
+                    style={styles.avatar}
+                  >
+                    <Text style={styles.avatarText}>
+                      {displayName.charAt(0).toUpperCase()}
+                    </Text>
+                  </LinearGradient>
+                )}
+                <View style={styles.statusBadge}>
+                  <Ionicons name="sparkles" size={12} color="#ffffff" />
+                </View>
+              </View>
+              <Text style={styles.userName}>{displayName}</Text>
+              <Text style={styles.userSubtitle}>
+                VibeScript Explorer since {createdAt}
+              </Text>
+              <View style={styles.userLevel}>
+                <Ionicons name="trophy" size={16} color="#FFD700" />
+                <Text style={styles.levelText}>
+                  {profileStats.totalAnalyses < 5
+                    ? "Beginner"
+                    : profileStats.totalAnalyses < 15
+                    ? "Explorer"
+                    : profileStats.totalAnalyses < 30
+                    ? "Expert"
+                    : "Master"}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.userSubtitle}>
-              VibeScript Explorer since {createdAt}
-            </Text>
           </View>
 
-          {/* Stats Cards */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {profileStats.totalAnalyses}
-              </Text>
-              <Text style={styles.statLabel}>Analyses</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {profileStats.currentStreak}
-              </Text>
-              <Text style={styles.statLabel}>Day Streak</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {profileStats.averageScore}%
-              </Text>
-              <Text style={styles.statLabel}>Avg Score</Text>
+          {/* Enhanced Stats Cards */}
+          <View style={styles.statsSection}>
+            <Text style={styles.sectionTitle}>Your Journey</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="document-text" size={24} color="#10B981" />
+                </View>
+                <Text style={styles.statNumber}>
+                  {profileStats.totalAnalyses}
+                </Text>
+                <Text style={styles.statLabel}>Analyses</Text>
+                <Text style={styles.statSubtext}>Total completed</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="flame" size={24} color="#F59E0B" />
+                </View>
+                <Text style={styles.statNumber}>
+                  {profileStats.currentStreak}
+                </Text>
+                <Text style={styles.statLabel}>Day Streak</Text>
+                <Text style={styles.statSubtext}>Keep it up!</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="star" size={24} color="#8B5CF6" />
+                </View>
+                <Text style={styles.statNumber}>
+                  {profileStats.averageScore}%
+                </Text>
+                <Text style={styles.statLabel}>Avg Score</Text>
+                <Text style={styles.statSubtext}>Confidence level</Text>
+              </View>
             </View>
           </View>
 
           {/* Personality Radar Chart */}
           <View style={styles.radarSection}>
             <Text style={styles.sectionTitle}>
-              {latestTraits ? "Latest Analysis" : "Your Personality Profile"}
+              {latestTraits
+                ? "Your unique personality signature"
+                : "Your Personality Profile"}
             </Text>
             {latestTraits ? (
               <View style={styles.radarContainer}>
@@ -171,17 +213,26 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <View style={styles.noDataContainer}>
-                <Ionicons
-                  name="analytics-outline"
-                  size={48}
-                  color="rgba(255, 255, 255, 0.5)"
-                />
+                <View style={styles.noDataIcon}>
+                  <Ionicons
+                    name="analytics-outline"
+                    size={48}
+                    color="rgba(255, 255, 255, 0.5)"
+                  />
+                </View>
+                <Text style={styles.noDataTitle}>
+                  Discover Your Personality
+                </Text>
                 <Text style={styles.noDataText}>
-                  Complete your first handwriting analysis to see your
-                  personality radar!
+                  Complete your first handwriting analysis to unlock your unique
+                  personality radar and discover what your writing reveals about
+                  you!
                 </Text>
                 <TouchableOpacity style={styles.analyzeButton}>
-                  <Text style={styles.analyzeButtonText}>Start Analysis</Text>
+                  <Ionicons name="sparkles" size={16} color="#ffffff" />
+                  <Text style={styles.analyzeButtonText}>
+                    Start Your Journey
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -209,6 +260,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#ffffff",
   },
+  profileCover: {
+    position: "relative",
+    marginBottom: 30,
+  },
+  coverGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 20,
+  },
   userHeader: {
     alignItems: "center",
     marginBottom: 30,
@@ -231,6 +294,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#ffffff",
   },
+  statusBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#10B981",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
   userName: {
     fontSize: 24,
     fontWeight: "bold",
@@ -240,6 +316,25 @@ const styles = StyleSheet.create({
   userSubtitle: {
     fontSize: 14,
     color: "rgba(255, 255, 255, 0.8)",
+  },
+  userLevel: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  levelText: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginLeft: 5,
+  },
+  statsSection: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#ffffff",
+    marginBottom: 15,
   },
   statsContainer: {
     flexDirection: "row",
@@ -256,6 +351,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
+  statIconContainer: {
+    marginBottom: 10,
+  },
   statNumber: {
     fontSize: 24,
     fontWeight: "bold",
@@ -267,14 +365,12 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
     fontWeight: "500",
   },
+  statSubtext: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
   radarSection: {
     marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 15,
   },
   radarContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -293,10 +389,18 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.2)",
     alignItems: "center",
   },
+  noDataIcon: {
+    marginBottom: 15,
+  },
+  noDataTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#ffffff",
+    marginBottom: 10,
+  },
   noDataText: {
     fontSize: 16,
     color: "rgba(255, 255, 255, 0.8)",
-    marginTop: 15,
     marginBottom: 20,
     textAlign: "center",
     lineHeight: 22,
@@ -305,10 +409,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#EC4899",
     padding: 15,
     borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   analyzeButtonText: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#ffffff",
+    marginLeft: 5,
   },
 })
