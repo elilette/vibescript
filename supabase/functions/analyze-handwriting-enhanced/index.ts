@@ -458,7 +458,10 @@ Examine all aspects including letter formation, spacing, pressure, slant, baseli
       ],
       response_format: {
         type: "json_schema",
-        json_schema: enhancedGraphologySchema,
+        json_schema: {
+          name: "enhanced_graphology_analysis",
+          schema: enhancedGraphologySchema,
+        },
       },
       max_tokens: 3000,
       temperature: 0.2,
