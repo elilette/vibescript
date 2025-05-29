@@ -1,28 +1,24 @@
-import React from "react"
-import { View, Text, StyleSheet, ScrollView } from "react-native"
+import React, { useState, useEffect } from "react"
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import GradientBackground from "../components/GradientBackground"
+import PersonalityChart from "../components/PersonalityChart"
 import { PersonalityTrait } from "../types"
-
-const mockPersonalityTraits: PersonalityTrait[] = [
-  { name: "Creativity", score: 87, color: "#EC4899", icon: "bulb" },
-  {
-    name: "Emotional Intelligence",
-    score: 92,
-    color: "#F97316",
-    icon: "heart",
-  },
-  { name: "Leadership", score: 78, color: "#3B82F6", icon: "star" },
-  { name: "Social Skills", score: 85, color: "#10B981", icon: "people" },
-  {
-    name: "Analytical Thinking",
-    score: 90,
-    color: "#8B5CF6",
-    icon: "analytics",
-  },
-  { name: "Energy Level", score: 83, color: "#F59E0B", icon: "flash" },
-]
+import {
+  HandwritingCheckin,
+  TraitTrend,
+  PersonalitySnapshot,
+} from "../types/analysis"
+import { getAnalysisData, convertTraitsToDisplay } from "../utils/analysisUtils"
+import { supabase } from "../services/supabase"
 
 interface TraitCardProps {
   trait: PersonalityTrait
@@ -53,6 +49,60 @@ const TraitCard: React.FC<TraitCardProps> = ({ trait }) => {
 }
 
 export default function AnalysisScreen() {
+  const [loading, setLoading] = useState(true)
+  const [analysisData, setAnalysisData] = useState<{
+    latestAnalysis: HandwritingCheckin | null
+    traitTrends: TraitTrend[]
+    snapshots: PersonalitySnapshot[]
+    hasData: boolean
+  }>({
+    latestAnalysis: null,
+    traitTrends: [],
+    snapshots: [],
+    hasData: false,
+  })
+  const [selectedTrait, setSelectedTrait] = useState<string>("CNF")
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadAnalysisData()
+  }, [])
+
+  const loadAnalysisData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Get current user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setError("Please log in to view your analysis")
+        return
+      }
+
+      const data = await getAnalysisData(user.id)
+
+      if (!data.success) {
+        setError("Failed to load analysis data")
+        return
+      }
+
+      setAnalysisData(data)
+
+      // Set default selected trait to the first available trend
+      if (data.traitTrends.length > 0) {
+        setSelectedTrait(data.traitTrends[0].trait_code)
+      }
+    } catch (err) {
+      console.error("Error loading analysis data:", err)
+      setError("An error occurred while loading your analysis")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getScoreInterpretation = (score: number) => {
     if (score >= 90) return { text: "Exceptional", color: "#10B981" }
     if (score >= 80) return { text: "Strong", color: "#3B82F6" }
@@ -61,12 +111,103 @@ export default function AnalysisScreen() {
     return { text: "Developing", color: "#EF4444" }
   }
 
-  const averageScore = Math.round(
-    mockPersonalityTraits.reduce((sum, trait) => sum + trait.score, 0) /
-      mockPersonalityTraits.length
-  )
+  const getInsightsFromAnalysis = (analysis: HandwritingCheckin) => {
+    const insights = []
 
+    if (analysis.ai_analysis?.recommendations?.strengths_to_leverage) {
+      insights.push({
+        title: "💪 Key Strengths",
+        text: analysis.ai_analysis.recommendations.strengths_to_leverage.join(
+          ", "
+        ),
+      })
+    }
+
+    if (analysis.ai_analysis?.behavioral_indicators?.creativity_level) {
+      insights.push({
+        title: "🎨 Creativity Level",
+        text: analysis.ai_analysis.behavioral_indicators.creativity_level,
+      })
+    }
+
+    if (analysis.ai_analysis?.personality_traits?.thinking_style) {
+      insights.push({
+        title: "🧠 Thinking Style",
+        text: analysis.ai_analysis.personality_traits.thinking_style,
+      })
+    }
+
+    return insights
+  }
+
+  if (loading) {
+    return (
+      <GradientBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#ffffff" />
+            <Text style={styles.loadingText}>
+              Loading your personality analysis...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </GradientBackground>
+    )
+  }
+
+  if (error) {
+    return (
+      <GradientBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={48} color="#EF4444" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={loadAnalysisData}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </GradientBackground>
+    )
+  }
+
+  if (!analysisData.hasData) {
+    return (
+      <GradientBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.emptyContainer}>
+            <Ionicons
+              name="document-text"
+              size={64}
+              color="rgba(255, 255, 255, 0.5)"
+            />
+            <Text style={styles.emptyTitle}>No Analysis Yet</Text>
+            <Text style={styles.emptyText}>
+              Upload your first handwriting sample to see your personality
+              analysis and trends over time.
+            </Text>
+          </View>
+        </SafeAreaView>
+      </GradientBackground>
+    )
+  }
+
+  const { latestAnalysis, traitTrends } = analysisData
+  const personalityTraits = latestAnalysis
+    ? convertTraitsToDisplay(latestAnalysis.traits)
+    : []
+  const averageScore =
+    personalityTraits.length > 0
+      ? Math.round(
+          personalityTraits.reduce((sum, trait) => sum + trait.score, 0) /
+            personalityTraits.length
+        )
+      : 0
   const interpretation = getScoreInterpretation(averageScore)
+  const insights = latestAnalysis ? getInsightsFromAnalysis(latestAnalysis) : []
 
   return (
     <GradientBackground>
@@ -75,7 +216,9 @@ export default function AnalysisScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Your Personality Profile</Text>
             <Text style={styles.subtitle}>
-              Here's what your handwriting reveals about your unique personality
+              Based on {analysisData.snapshots.length} day
+              {analysisData.snapshots.length !== 1 ? "s" : ""} of handwriting
+              analysis
             </Text>
           </View>
 
@@ -94,51 +237,63 @@ export default function AnalysisScreen() {
                 {interpretation.text}
               </Text>
             </View>
+            {latestAnalysis && (
+              <Text style={styles.confidenceScore}>
+                Confidence: {Math.round(latestAnalysis.confidence_score * 100)}%
+              </Text>
+            )}
           </View>
+
+          {/* Time-series chart */}
+          {traitTrends.length > 0 && (
+            <View style={styles.chartSection}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="trending-up" size={24} color="#ffffff" />
+                <Text style={styles.sectionTitle}>Personality Trends</Text>
+              </View>
+              <PersonalityChart
+                traitTrends={traitTrends}
+                selectedTrait={selectedTrait}
+                onTraitSelect={setSelectedTrait}
+              />
+            </View>
+          )}
 
           <View style={styles.traitsSection}>
             <View style={styles.sectionHeader}>
               <Ionicons name="analytics" size={24} color="#ffffff" />
-              <Text style={styles.sectionTitle}>Personality Traits</Text>
+              <Text style={styles.sectionTitle}>Current Traits</Text>
             </View>
 
-            {mockPersonalityTraits.map((trait, index) => (
+            {personalityTraits.map((trait, index) => (
               <TraitCard key={index} trait={trait} />
             ))}
           </View>
 
-          <View style={styles.insightsSection}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="bulb" size={24} color="#ffffff" />
-              <Text style={styles.sectionTitle}>Key Insights</Text>
-            </View>
+          {insights.length > 0 && (
+            <View style={styles.insightsSection}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="bulb" size={24} color="#ffffff" />
+                <Text style={styles.sectionTitle}>AI Insights</Text>
+              </View>
 
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>🎨 Creative Powerhouse</Text>
-              <Text style={styles.insightText}>
-                Your handwriting shows strong creative tendencies. You think
-                outside the box and approach problems with innovative solutions.
-              </Text>
+              {insights.map((insight, index) => (
+                <View key={index} style={styles.insightCard}>
+                  <Text style={styles.insightTitle}>{insight.title}</Text>
+                  <Text style={styles.insightText}>{insight.text}</Text>
+                </View>
+              ))}
             </View>
+          )}
 
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>🧠 Analytical Mind</Text>
-              <Text style={styles.insightText}>
-                You possess excellent analytical skills, showing systematic
-                thinking and attention to detail in your writing patterns.
+          {latestAnalysis && (
+            <View style={styles.lastAnalysisSection}>
+              <Text style={styles.lastAnalysisText}>
+                Last analysis:{" "}
+                {new Date(latestAnalysis.created_at).toLocaleDateString()}
               </Text>
             </View>
-
-            <View style={styles.insightCard}>
-              <Text style={styles.insightTitle}>
-                ❤️ Emotionally Intelligent
-              </Text>
-              <Text style={styles.insightText}>
-                High emotional intelligence is evident in your writing,
-                suggesting strong empathy and social awareness.
-              </Text>
-            </View>
-          </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     </GradientBackground>
@@ -152,6 +307,59 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#ffffff",
+    fontSize: 16,
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  errorText: {
+    color: "#ffffff",
+    fontSize: 16,
+    textAlign: "center",
+    marginVertical: 16,
+  },
+  retryButton: {
+    backgroundColor: "#3B82F6",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  emptyTitle: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
   },
   header: {
     alignItems: "center",
@@ -197,6 +405,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     marginTop: 5,
+  },
+  confidenceScore: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginTop: 8,
+  },
+  chartSection: {
+    marginBottom: 30,
   },
   traitsSection: {
     marginBottom: 30,
@@ -259,7 +475,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   insightsSection: {
-    marginBottom: 20,
+    marginBottom: 30,
   },
   insightCard: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -279,5 +495,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255, 255, 255, 0.8)",
     lineHeight: 20,
+  },
+  lastAnalysisSection: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+  lastAnalysisText: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.6)",
   },
 })

@@ -11,63 +11,80 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import GradientBackground from "../components/GradientBackground"
+import RadarChart from "../components/RadarChart"
 import { useAuth } from "../context/AuthContext"
-import { Achievement, PersonalityVibe } from "../types"
-
-const mockAchievements: Achievement[] = [
-  {
-    id: "1",
-    title: "First Analysis",
-    description: "Completed your first handwriting analysis",
-    icon: "star",
-    color: "#F59E0B",
-    unlocked: true,
-    unlocked_at: "2024-03-01",
-  },
-  {
-    id: "2",
-    title: "7-Day Streak",
-    description: "Analyzed handwriting for 7 consecutive days",
-    icon: "calendar",
-    color: "#F59E0B",
-    unlocked: true,
-    unlocked_at: "2024-03-07",
-  },
-  {
-    id: "3",
-    title: "Creative Genius",
-    description: "Achieved 90%+ creativity score",
-    icon: "trophy",
-    color: "#6B7280",
-    unlocked: false,
-  },
-  {
-    id: "4",
-    title: "Journal Master",
-    description: "Write 30 journal entries",
-    icon: "medal",
-    color: "#6B7280",
-    unlocked: false,
-  },
-]
-
-const mockPersonalityVibe: PersonalityVibe = {
-  creativity: 88,
-  confidence: 92,
-  focus: 78,
-}
+import { supabase } from "../services/supabase"
+import { PersonalityTraits } from "../types/analysis"
 
 export default function ProfileScreen() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
+  const [latestTraits, setLatestTraits] = useState<PersonalityTraits | null>(
+    null
+  )
+  const [profileStats, setProfileStats] = useState({
+    totalAnalyses: 0,
+    currentStreak: 0,
+    averageScore: 0,
+  })
 
   useEffect(() => {
     if (user) {
-      // For now, just set loading to false since we're using mock data
-      setLoading(false)
+      fetchLatestAnalysis()
+      fetchProfileStats()
     }
   }, [user])
+
+  const fetchLatestAnalysis = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("handwriting_checkins")
+        .select("traits, created_at")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error && error.code !== "PGRST116") {
+        console.error("Error fetching latest analysis:", error)
+        return
+      }
+
+      if (data) {
+        setLatestTraits(data.traits)
+      }
+    } catch (error) {
+      console.error("Error fetching latest analysis:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchProfileStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("total_analyses, current_streak, average_score")
+        .eq("id", user?.id)
+        .single()
+
+      if (error && error.code !== "PGRST116") {
+        console.error("Error fetching profile stats:", error)
+        return
+      }
+
+      if (data) {
+        setProfileStats({
+          totalAnalyses: data.total_analyses || 0,
+          currentStreak: data.current_streak || 0,
+          averageScore: Math.round(data.average_score || 0), // Already converted to percentage in DB
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching profile stats:", error)
+    }
+  }
 
   if (!user || loading) {
     return (
@@ -95,167 +112,130 @@ export default function ProfileScreen() {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content}>
-          {/* User Header */}
-          <View style={styles.userHeader}>
-            <View style={styles.avatarContainer}>
-              {avatarUrl && !imageError ? (
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={styles.avatar}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <LinearGradient
-                  colors={["#EC4899", "#8B5CF6", "#3B82F6"]}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {displayName.charAt(0).toUpperCase()}
-                  </Text>
-                </LinearGradient>
-              )}
+          {/* User Header with Cover */}
+          <View style={styles.profileCover}>
+            <LinearGradient
+              colors={[
+                "rgba(236, 72, 153, 0.8)",
+                "rgba(139, 92, 246, 0.8)",
+                "rgba(59, 130, 246, 0.8)",
+              ]}
+              style={styles.coverGradient}
+            />
+            <View style={styles.userHeader}>
+              <View style={styles.avatarContainer}>
+                {avatarUrl && !imageError ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatar}
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <LinearGradient
+                    colors={["#EC4899", "#8B5CF6", "#3B82F6"]}
+                    style={styles.avatar}
+                  >
+                    <Text style={styles.avatarText}>
+                      {displayName.charAt(0).toUpperCase()}
+                    </Text>
+                  </LinearGradient>
+                )}
+                <View style={styles.statusBadge}>
+                  <Ionicons name="sparkles" size={12} color="#ffffff" />
+                </View>
+              </View>
+              <Text style={styles.userName}>{displayName}</Text>
+              <Text style={styles.userSubtitle}>
+                VibeScript Explorer since {createdAt}
+              </Text>
+              <View style={styles.userLevel}>
+                <Ionicons name="trophy" size={16} color="#FFD700" />
+                <Text style={styles.levelText}>
+                  {profileStats.totalAnalyses < 5
+                    ? "Beginner"
+                    : profileStats.totalAnalyses < 15
+                    ? "Explorer"
+                    : profileStats.totalAnalyses < 30
+                    ? "Expert"
+                    : "Master"}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.userSubtitle}>
-              VibeScript Explorer since {createdAt}
+          </View>
+
+          {/* Enhanced Stats Cards */}
+          <View style={styles.statsSection}>
+            <Text style={styles.sectionTitle}>Your Journey</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="document-text" size={24} color="#10B981" />
+                </View>
+                <Text style={styles.statNumber}>
+                  {profileStats.totalAnalyses}
+                </Text>
+                <Text style={styles.statLabel}>Analyses</Text>
+                <Text style={styles.statSubtext}>Total completed</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="flame" size={24} color="#F59E0B" />
+                </View>
+                <Text style={styles.statNumber}>
+                  {profileStats.currentStreak}
+                </Text>
+                <Text style={styles.statLabel}>Day Streak</Text>
+                <Text style={styles.statSubtext}>Keep it up!</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="star" size={24} color="#8B5CF6" />
+                </View>
+                <Text style={styles.statNumber}>
+                  {profileStats.averageScore}%
+                </Text>
+                <Text style={styles.statLabel}>Avg Score</Text>
+                <Text style={styles.statSubtext}>Confidence level</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Personality Radar Chart */}
+          <View style={styles.radarSection}>
+            <Text style={styles.sectionTitle}>
+              {latestTraits
+                ? "Your unique personality signature"
+                : "Your Personality Profile"}
             </Text>
-          </View>
-
-          {/* Stats Cards */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Analyses</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>7</Text>
-              <Text style={styles.statLabel}>Day Streak</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>85%</Text>
-              <Text style={styles.statLabel}>Avg Score</Text>
-            </View>
-          </View>
-
-          {/* Personality Vibe */}
-          <View style={styles.vibeSection}>
-            <Text style={styles.sectionTitle}>Your Personality Vibe</Text>
-            <View style={styles.vibeCard}>
-              <View style={styles.vibeItem}>
-                <View style={styles.vibeHeader}>
-                  <Text style={styles.vibeName}>Creativity</Text>
-                  <Text style={styles.vibeScore}>
-                    {mockPersonalityVibe.creativity}%
-                  </Text>
-                </View>
-                <View style={styles.vibeBarContainer}>
-                  <View style={styles.vibeBarBackground}>
-                    <View
-                      style={[
-                        styles.vibeBarFill,
-                        {
-                          width: `${mockPersonalityVibe.creativity}%`,
-                          backgroundColor: "#EC4899",
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
+            {latestTraits ? (
+              <View style={styles.radarContainer}>
+                <RadarChart traits={latestTraits} />
               </View>
-
-              <View style={styles.vibeItem}>
-                <View style={styles.vibeHeader}>
-                  <Text style={styles.vibeName}>Confidence</Text>
-                  <Text style={styles.vibeScore}>
-                    {mockPersonalityVibe.confidence}%
+            ) : (
+              <View style={styles.noDataContainer}>
+                <View style={styles.noDataIcon}>
+                  <Ionicons
+                    name="analytics-outline"
+                    size={48}
+                    color="rgba(255, 255, 255, 0.5)"
+                  />
+                </View>
+                <Text style={styles.noDataTitle}>
+                  Discover Your Personality
+                </Text>
+                <Text style={styles.noDataText}>
+                  Complete your first handwriting analysis to unlock your unique
+                  personality radar and discover what your writing reveals about
+                  you!
+                </Text>
+                <TouchableOpacity style={styles.analyzeButton}>
+                  <Ionicons name="sparkles" size={16} color="#ffffff" />
+                  <Text style={styles.analyzeButtonText}>
+                    Start Your Journey
                   </Text>
-                </View>
-                <View style={styles.vibeBarContainer}>
-                  <View style={styles.vibeBarBackground}>
-                    <View
-                      style={[
-                        styles.vibeBarFill,
-                        {
-                          width: `${mockPersonalityVibe.confidence}%`,
-                          backgroundColor: "#3B82F6",
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
+                </TouchableOpacity>
               </View>
-
-              <View style={styles.vibeItem}>
-                <View style={styles.vibeHeader}>
-                  <Text style={styles.vibeName}>Focus</Text>
-                  <Text style={styles.vibeScore}>
-                    {mockPersonalityVibe.focus}%
-                  </Text>
-                </View>
-                <View style={styles.vibeBarContainer}>
-                  <View style={styles.vibeBarBackground}>
-                    <View
-                      style={[
-                        styles.vibeBarFill,
-                        {
-                          width: `${mockPersonalityVibe.focus}%`,
-                          backgroundColor: "#10B981",
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Achievements */}
-          <View style={styles.achievementsSection}>
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            <View style={styles.achievementsGrid}>
-              {mockAchievements.map((achievement) => (
-                <View
-                  key={achievement.id}
-                  style={[
-                    styles.achievementCard,
-                    !achievement.unlocked && styles.lockedAchievement,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.achievementIcon,
-                      {
-                        backgroundColor: achievement.unlocked
-                          ? achievement.color
-                          : "#6B7280",
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={achievement.icon as any}
-                      size={24}
-                      color="#ffffff"
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.achievementTitle,
-                      !achievement.unlocked && styles.lockedText,
-                    ]}
-                  >
-                    {achievement.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.achievementDescription,
-                      !achievement.unlocked && styles.lockedText,
-                    ]}
-                  >
-                    {achievement.description}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -280,6 +260,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#ffffff",
   },
+  profileCover: {
+    position: "relative",
+    marginBottom: 30,
+  },
+  coverGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 20,
+  },
   userHeader: {
     alignItems: "center",
     marginBottom: 30,
@@ -302,6 +294,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#ffffff",
   },
+  statusBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#10B981",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
   userName: {
     fontSize: 24,
     fontWeight: "bold",
@@ -311,6 +316,25 @@ const styles = StyleSheet.create({
   userSubtitle: {
     fontSize: 14,
     color: "rgba(255, 255, 255, 0.8)",
+  },
+  userLevel: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  levelText: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginLeft: 5,
+  },
+  statsSection: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#ffffff",
+    marginBottom: 15,
   },
   statsContainer: {
     flexDirection: "row",
@@ -327,6 +351,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
+  statIconContainer: {
+    marginBottom: 10,
+  },
   statNumber: {
     fontSize: 24,
     fontWeight: "bold",
@@ -338,97 +365,58 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
     fontWeight: "500",
   },
-  vibeSection: {
+  statSubtext: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  radarSection: {
     marginBottom: 30,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 15,
-  },
-  vibeCard: {
+  radarContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  vibeItem: {
-    marginBottom: 20,
-  },
-  vibeHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  vibeName: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.8)",
-    fontWeight: "500",
-  },
-  vibeScore: {
-    fontSize: 16,
-    color: "#ffffff",
-    fontWeight: "bold",
-  },
-  vibeBarContainer: {
-    width: "100%",
-  },
-  vibeBarBackground: {
-    height: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  vibeBarFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  achievementsSection: {
-    marginBottom: 30,
-  },
-  achievementsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  achievementCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 16,
-    padding: 15,
-    width: "48%",
-    marginBottom: 15,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  lockedAchievement: {
-    opacity: 0.6,
-  },
-  achievementIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
   },
-  achievementTitle: {
-    fontSize: 14,
+  noDataContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 20,
+    padding: 40,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+  },
+  noDataIcon: {
+    marginBottom: 15,
+  },
+  noDataTitle: {
+    fontSize: 18,
     fontWeight: "bold",
     color: "#ffffff",
-    textAlign: "center",
-    marginBottom: 5,
+    marginBottom: 10,
   },
-  achievementDescription: {
-    fontSize: 12,
+  noDataText: {
+    fontSize: 16,
     color: "rgba(255, 255, 255, 0.8)",
+    marginBottom: 20,
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 22,
   },
-  lockedText: {
-    color: "rgba(255, 255, 255, 0.5)",
+  analyzeButton: {
+    backgroundColor: "#EC4899",
+    padding: 15,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  analyzeButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#ffffff",
+    marginLeft: 5,
   },
 })

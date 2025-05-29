@@ -14,12 +14,14 @@ import * as ImagePicker from "expo-image-picker"
 import * as DocumentPicker from "expo-document-picker"
 import * as FileSystem from "expo-file-system"
 import GradientBackground from "../components/GradientBackground"
-import { PhotoAnalysisResponse } from "../types/analysis"
+import { EnhancedAnalysisResponse } from "../types/analysis"
+import { useAuth } from "../context/AuthContext"
 
 export default function UploadScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
+  const { session } = useAuth()
 
   // Moved from photoAnalysis.ts - Convert image to base64
   const convertImageToBase64 = async (imageUri: string): Promise<string> => {
@@ -38,24 +40,30 @@ export default function UploadScreen() {
   const analyzePhoto = async (
     imageBase64: string,
     customPrompt?: string
-  ): Promise<PhotoAnalysisResponse> => {
+  ): Promise<EnhancedAnalysisResponse> => {
     try {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
-      if (!supabaseUrl || !supabaseAnonKey) {
+      if (!supabaseUrl) {
         return {
           success: false,
           error: "Supabase configuration missing",
         }
       }
 
+      if (!session?.access_token) {
+        return {
+          success: false,
+          error: "User not authenticated",
+        }
+      }
+
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/analyze-photo`,
+        `${supabaseUrl}/functions/v1/analyze-handwriting-enhanced`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${supabaseAnonKey}`,
+            Authorization: `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -75,9 +83,12 @@ export default function UploadScreen() {
       }
 
       const result = await response.json()
-      return result as PhotoAnalysisResponse
+      return result as EnhancedAnalysisResponse
     } catch (error) {
-      console.error("Error calling analyze-photo function:", error)
+      console.error(
+        "Error calling analyze-handwriting-enhanced function:",
+        error
+      )
       return {
         success: false,
         error:
@@ -150,6 +161,14 @@ export default function UploadScreen() {
       return
     }
 
+    if (!session?.access_token) {
+      Alert.alert(
+        "Authentication Required",
+        "Please sign in to analyze your handwriting"
+      )
+      return
+    }
+
     setIsAnalyzing(true)
 
     try {
@@ -163,14 +182,18 @@ export default function UploadScreen() {
         // Use the pre-formatted analysis from the server
         setAnalysisResult(result.formatted_analysis)
         Alert.alert(
-          "Analysis Complete! 🎉",
-          "Your handwriting has been analyzed using advanced AI graphology techniques by Dr. Sarah Mitchell!",
+          "Enhanced Analysis Complete! 🎉",
+          `Your handwriting has been analyzed with advanced AI graphology techniques!\n\n📊 Confidence Score: ${Math.round(
+            (result.confidence_score || 0) * 100
+          )}%\n🎯 Overall Score: ${Math.round(
+            (result.overall_score || 0) * 100
+          )}%\n\nView your quantified personality traits and detailed insights below!`,
           [
             {
               text: "View Results",
               onPress: () => {
                 // Analysis is already set in state and will be displayed
-                console.log("Analysis results:", result.analysis)
+                console.log("Enhanced analysis results:", result.analysis)
               },
             },
           ]
@@ -208,38 +231,84 @@ export default function UploadScreen() {
             </Text>
           </View>
 
-          {selectedImage && (
+          <View style={styles.imageContainer}>
             <View style={styles.imagePreview}>
-              <Image
-                source={{ uri: selectedImage }}
-                style={styles.previewImage}
-              />
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => {
-                  setSelectedImage(null)
-                  setAnalysisResult(null)
-                }}
-              >
-                <Ionicons name="close-circle" size={24} color="#ffffff" />
-              </TouchableOpacity>
+              {selectedImage ? (
+                <>
+                  <Image
+                    source={{ uri: selectedImage }}
+                    style={styles.previewImage}
+                  />
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => {
+                      setSelectedImage(null)
+                      setAnalysisResult(null)
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#ffffff" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={styles.placeholderContainer}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    Alert.alert(
+                      "Add Handwriting Sample",
+                      "Choose how you'd like to add your handwriting:",
+                      [
+                        {
+                          text: "📷 Take Photo",
+                          onPress: takePhoto,
+                        },
+                        {
+                          text: "📁 Upload from Gallery",
+                          onPress: pickImage,
+                        },
+                        {
+                          text: "Cancel",
+                          style: "cancel",
+                        },
+                      ]
+                    )
+                  }}
+                >
+                  <View style={styles.iconContainer}>
+                    <Ionicons
+                      name="cloud-upload-outline"
+                      size={48}
+                      color="rgba(255, 255, 255, 0.6)"
+                    />
+                  </View>
+                  <Text style={styles.placeholderTitle}>
+                    Upload Your Handwriting
+                  </Text>
+                  <Text style={styles.placeholderSubtext}>
+                    Tap to capture with camera or select from gallery
+                  </Text>
+                  <View style={styles.actionHints}>
+                    <View style={styles.hintItem}>
+                      <Ionicons
+                        name="camera"
+                        size={16}
+                        color="rgba(255, 255, 255, 0.5)"
+                      />
+                      <Text style={styles.hintText}>Camera</Text>
+                    </View>
+                    <View style={styles.hintDivider} />
+                    <View style={styles.hintItem}>
+                      <Ionicons
+                        name="images"
+                        size={16}
+                        color="rgba(255, 255, 255, 0.5)"
+                      />
+                      <Text style={styles.hintText}>Gallery</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
-          )}
-
-          <View style={styles.uploadOptions}>
-            <TouchableOpacity style={styles.uploadButton} onPress={takePhoto}>
-              <View style={styles.uploadButtonContent}>
-                <Ionicons name="camera" size={20} color="#ffffff" />
-                <Text style={styles.uploadButtonTitle}>Take Photo</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-              <View style={styles.uploadButtonContent}>
-                <Ionicons name="cloud-upload" size={20} color="#ffffff" />
-                <Text style={styles.uploadButtonTitle}>Upload File</Text>
-              </View>
-            </TouchableOpacity>
           </View>
 
           {selectedImage && (
@@ -250,12 +319,34 @@ export default function UploadScreen() {
               ]}
               onPress={handleAnalyzePhoto}
               disabled={isAnalyzing}
+              activeOpacity={0.8}
             >
-              <Text style={styles.analyzeButtonText}>
-                {isAnalyzing
-                  ? "Analyzing Handwriting... 🧠"
-                  : "Analyze Handwriting ✨"}
-              </Text>
+              <View style={styles.analyzeButtonContent}>
+                <View style={styles.analyzeIconContainer}>
+                  <Ionicons
+                    name={isAnalyzing ? "hourglass-outline" : "sparkles"}
+                    size={24}
+                    color="#ffffff"
+                  />
+                </View>
+                <View style={styles.analyzeTextContainer}>
+                  <Text style={styles.analyzeButtonTitle}>
+                    {isAnalyzing ? "Analyzing..." : "Analyze Handwriting"}
+                  </Text>
+                  <Text style={styles.analyzeButtonSubtitle}>
+                    {isAnalyzing
+                      ? "AI is decoding your personality"
+                      : "Discover your personality traits"}
+                  </Text>
+                </View>
+                {!isAnalyzing && (
+                  <Ionicons
+                    name="arrow-forward"
+                    size={20}
+                    color="rgba(255, 255, 255, 0.8)"
+                  />
+                )}
+              </View>
             </TouchableOpacity>
           )}
 
@@ -321,10 +412,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+  imageContainer: {
+    position: "relative",
+    marginBottom: 20,
+  },
   imagePreview: {
     position: "relative",
     marginBottom: 20,
     alignItems: "center",
+    width: "100%",
+    height: 400,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   previewImage: {
     width: "100%",
@@ -339,53 +440,54 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 12,
   },
-  uploadOptions: {
-    flexDirection: "row",
-    gap: 15,
-    marginBottom: 30,
-    justifyContent: "space-between",
-  },
-  uploadButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 16,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    flex: 1,
-  },
-  uploadButtonContent: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-  },
-  uploadButtonTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
   analyzeButton: {
     backgroundColor: "#10B981",
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 20,
+    padding: 20,
     alignItems: "center",
     marginBottom: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
     shadowColor: "#10B981",
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   analyzingButton: {
     backgroundColor: "#6B7280",
+    shadowColor: "#6B7280",
   },
-  analyzeButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
+  analyzeButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  analyzeIconContainer: {
+    marginRight: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 12,
+    padding: 8,
+  },
+  analyzeTextContainer: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  analyzeButtonTitle: {
+    fontSize: 18,
+    fontWeight: "700",
     color: "#ffffff",
+    marginBottom: 2,
+    letterSpacing: 0.3,
+  },
+  analyzeButtonSubtitle: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.85)",
+    fontWeight: "500",
   },
   analysisContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -424,5 +526,69 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
     marginBottom: 6,
     lineHeight: 20,
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderStyle: "dashed",
+    borderRadius: 20,
+    margin: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  placeholderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#ffffff",
+    marginTop: 8,
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.5,
+  },
+  placeholderSubtext: {
+    fontSize: 15,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginBottom: 4,
+    textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: 10,
+  },
+  iconContainer: {
+    marginBottom: 16,
+  },
+  actionHints: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  hintItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 8,
+  },
+  hintDivider: {
+    width: 1,
+    height: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    marginHorizontal: 8,
+  },
+  hintText: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginLeft: 4,
+    fontWeight: "500",
   },
 })
