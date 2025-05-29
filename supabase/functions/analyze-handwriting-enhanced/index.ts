@@ -515,7 +515,28 @@ Examine all aspects including letter formation, spacing, pressure, slant, baseli
     const features = structuredAnalysis.quantified_features
     const traits = structuredAnalysis.quantified_traits
     const overallScore = calculateOverallScore(traits)
-    const confidenceScore = structuredAnalysis.confidence_score
+
+    // Ensure confidence_score is valid, provide fallback if missing
+    let confidenceScore = structuredAnalysis.confidence_score
+    if (
+      confidenceScore === null ||
+      confidenceScore === undefined ||
+      isNaN(confidenceScore)
+    ) {
+      // Calculate a fallback confidence score based on overall assessment
+      const confidenceLevel =
+        structuredAnalysis.overall_assessment?.confidence_level
+      confidenceScore =
+        confidenceLevel === "high"
+          ? 0.8
+          : confidenceLevel === "medium"
+          ? 0.6
+          : 0.4
+      console.warn(
+        `Missing confidence_score, using fallback: ${confidenceScore}`
+      )
+    }
+
     const formattedAnalysis = formatAnalysisForDisplay(structuredAnalysis)
     const processingTime = Date.now() - startTime
 

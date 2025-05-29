@@ -6,14 +6,49 @@ CREATE OR REPLACE FUNCTION update_user_stats(
   p_new_analysis BOOLEAN DEFAULT FALSE
 )
 RETURNS VOID AS $$
+DECLARE
+  v_total_analyses INTEGER;
+  v_current_streak INTEGER := 0;
+  v_average_score DECIMAL;
+  v_check_date DATE;
+  v_analysis_exists BOOLEAN;
 BEGIN
   -- Update total analyses count and last analysis date
   IF p_new_analysis THEN
+    -- Count total analyses
+    SELECT COUNT(*) INTO v_total_analyses
+    FROM handwriting_checkins 
+    WHERE user_id = p_user_id;
+    
+    -- Calculate average score
+    SELECT AVG(overall_score * 100) INTO v_average_score
+    FROM handwriting_checkins 
+    WHERE user_id = p_user_id;
+    
+    -- Calculate current streak (consecutive days with at least one analysis)
+    v_check_date := CURRENT_DATE;
+    LOOP
+      SELECT EXISTS(
+        SELECT 1 FROM handwriting_checkins 
+        WHERE user_id = p_user_id 
+        AND DATE(created_at) = v_check_date
+      ) INTO v_analysis_exists;
+      
+      IF v_analysis_exists THEN
+        v_current_streak := v_current_streak + 1;
+        v_check_date := v_check_date - INTERVAL '1 day';
+      ELSE
+        EXIT;
+      END IF;
+    END LOOP;
+    
+    -- Update profile with calculated values
     UPDATE profiles 
     SET 
-      total_analyses = COALESCE(total_analyses, 0) + 1,
-      last_analysis_date = CURRENT_DATE,
-      updated_at = now()
+      total_analyses = v_total_analyses,
+      current_streak = v_current_streak,
+      average_score = COALESCE(v_average_score, 0),
+      last_analysis_date = CURRENT_DATE
     WHERE id = p_user_id;
   END IF;
 END;

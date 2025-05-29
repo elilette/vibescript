@@ -6,6 +6,7 @@ import SplashScreen from "./src/components/SplashScreen"
 import LoginScreen from "./src/screens/LoginScreen"
 import { AppProvider } from "./src/context/AppContext"
 import { AuthProvider, useAuth } from "./src/context/AuthContext"
+import { triggerTapHaptic } from "./src/utils/haptics"
 
 const AppContent = () => {
   const [isReady, setIsReady] = useState(false)
@@ -47,7 +48,11 @@ const AppContent = () => {
   // Show main app if authenticated
   return (
     <AppProvider>
-      <NavigationContainer>
+      <NavigationContainer
+        onStateChange={() => {
+          triggerTapHaptic()
+        }}
+      >
         <StatusBar style="light" backgroundColor="transparent" translucent />
         <Navigation />
       </NavigationContainer>

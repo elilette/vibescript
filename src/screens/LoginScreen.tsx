@@ -12,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@expo/vector-icons"
 import Octicons from "@expo/vector-icons/Octicons"
 import { useAuth } from "../context/AuthContext"
+import { triggerTapHaptic } from "../utils/haptics"
 
 const LoginScreen: React.FC = () => {
   const { signInWithApple, signInWithGoogle, loading } = useAuth()
@@ -19,6 +20,7 @@ const LoginScreen: React.FC = () => {
   const [isSigningInGoogle, setIsSigningInGoogle] = useState(false)
 
   const handleAppleSignIn = async () => {
+    triggerTapHaptic()
     try {
       setIsSigningInApple(true)
       await signInWithApple()
@@ -35,6 +37,7 @@ const LoginScreen: React.FC = () => {
   }
 
   const handleGoogleSignIn = async () => {
+    triggerTapHaptic()
     try {
       setIsSigningInGoogle(true)
       await signInWithGoogle()

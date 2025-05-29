@@ -6,21 +6,22 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  ScrollView,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
+import { useNavigation } from "@react-navigation/native"
 import * as ImagePicker from "expo-image-picker"
 import * as DocumentPicker from "expo-document-picker"
 import * as FileSystem from "expo-file-system"
 import GradientBackground from "../components/GradientBackground"
 import { EnhancedAnalysisResponse } from "../types/analysis"
 import { useAuth } from "../context/AuthContext"
+import { triggerTapHaptic } from "../utils/haptics"
 
 export default function UploadScreen() {
+  const navigation = useNavigation()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null)
   const { session } = useAuth()
 
   // Moved from photoAnalysis.ts - Convert image to base64
@@ -122,6 +123,7 @@ export default function UploadScreen() {
   }
 
   const takePhoto = async () => {
+    triggerTapHaptic()
     const hasPermission = await requestCameraPermissions()
     if (!hasPermission) return
 
@@ -134,11 +136,11 @@ export default function UploadScreen() {
 
     if (!result.canceled && result.assets[0]) {
       setSelectedImage(result.assets[0].uri)
-      setAnalysisResult(null) // Clear previous analysis
     }
   }
 
   const pickImage = async () => {
+    triggerTapHaptic()
     const hasPermission = await requestMediaLibraryPermissions()
     if (!hasPermission) return
 
@@ -151,11 +153,11 @@ export default function UploadScreen() {
 
     if (!result.canceled && result.assets[0]) {
       setSelectedImage(result.assets[0].uri)
-      setAnalysisResult(null) // Clear previous analysis
     }
   }
 
   const handleAnalyzePhoto = async () => {
+    triggerTapHaptic()
     if (!selectedImage) {
       Alert.alert("No image selected", "Please select an image first")
       return
@@ -179,25 +181,26 @@ export default function UploadScreen() {
       const result = await analyzePhoto(base64Image)
 
       if (result.success && result.formatted_analysis) {
-        // Use the pre-formatted analysis from the server
-        setAnalysisResult(result.formatted_analysis)
-        Alert.alert(
-          "Enhanced Analysis Complete! 🎉",
-          `Your handwriting has been analyzed with advanced AI graphology techniques!\n\n📊 Confidence Score: ${Math.round(
-            (result.confidence_score || 0) * 100
-          )}%\n🎯 Overall Score: ${Math.round(
-            (result.overall_score || 0) * 100
-          )}%\n\nView your quantified personality traits and detailed insights below!`,
-          [
-            {
-              text: "View Results",
-              onPress: () => {
-                // Analysis is already set in state and will be displayed
-                console.log("Enhanced analysis results:", result.analysis)
-              },
-            },
-          ]
-        )
+        // Navigate to Analysis detail screen with the result
+        ;(navigation as any).navigate("AnalysisDetail", {
+          analysis: {
+            id: result.analysis_id,
+            created_at: result.timestamp || new Date().toISOString(),
+            traits: result.traits,
+            overall_score: result.overall_score,
+            confidence_score: result.confidence_score,
+            features: result.features,
+            ai_analysis: result.analysis,
+            gpt_summary: result.formatted_analysis,
+            analysis_version: "2.0",
+            processing_time_ms: 0,
+            user_id: session?.user?.id,
+            image_url: selectedImage,
+          },
+        })
+
+        // Clear the selected image after successful analysis
+        setSelectedImage(null)
       } else {
         Alert.alert(
           "Analysis Failed",
@@ -219,18 +222,11 @@ export default function UploadScreen() {
   return (
     <GradientBackground>
       <SafeAreaView style={styles.container}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>Ready to Decode Your Handwriting?</Text>
-            <Text style={styles.subtitle}>
-              Upload a sample of your handwriting and let AI reveal your
-              personality secrets through graphology analysis
-            </Text>
-          </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Upload</Text>
+        </View>
 
+        <View style={styles.content}>
           <View style={styles.imageContainer}>
             <View style={styles.imagePreview}>
               {selectedImage ? (
@@ -242,11 +238,33 @@ export default function UploadScreen() {
                   <TouchableOpacity
                     style={styles.removeButton}
                     onPress={() => {
+                      triggerTapHaptic()
                       setSelectedImage(null)
-                      setAnalysisResult(null)
                     }}
                   >
                     <Ionicons name="close-circle" size={24} color="#ffffff" />
+                  </TouchableOpacity>
+
+                  {/* Analyze button positioned at bottom right */}
+                  <TouchableOpacity
+                    style={[
+                      styles.analyzeButtonCompact,
+                      isAnalyzing && styles.analyzingButtonCompact,
+                    ]}
+                    onPress={handleAnalyzePhoto}
+                    disabled={isAnalyzing}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.analyzeButtonCompactContent}>
+                      <Ionicons
+                        name={isAnalyzing ? "hourglass-outline" : "sparkles"}
+                        size={18}
+                        color="#ffffff"
+                      />
+                      <Text style={styles.analyzeButtonCompactText}>
+                        {isAnalyzing ? "Analyzing..." : "Analyze"}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -254,6 +272,7 @@ export default function UploadScreen() {
                   style={styles.placeholderContainer}
                   activeOpacity={0.8}
                   onPress={() => {
+                    triggerTapHaptic()
                     Alert.alert(
                       "Add Handwriting Sample",
                       "Choose how you'd like to add your handwriting:",
@@ -311,73 +330,20 @@ export default function UploadScreen() {
             </View>
           </View>
 
-          {selectedImage && (
-            <TouchableOpacity
-              style={[
-                styles.analyzeButton,
-                isAnalyzing && styles.analyzingButton,
-              ]}
-              onPress={handleAnalyzePhoto}
-              disabled={isAnalyzing}
-              activeOpacity={0.8}
-            >
-              <View style={styles.analyzeButtonContent}>
-                <View style={styles.analyzeIconContainer}>
-                  <Ionicons
-                    name={isAnalyzing ? "hourglass-outline" : "sparkles"}
-                    size={24}
-                    color="#ffffff"
-                  />
-                </View>
-                <View style={styles.analyzeTextContainer}>
-                  <Text style={styles.analyzeButtonTitle}>
-                    {isAnalyzing ? "Analyzing..." : "Analyze Handwriting"}
-                  </Text>
-                  <Text style={styles.analyzeButtonSubtitle}>
-                    {isAnalyzing
-                      ? "AI is decoding your personality"
-                      : "Discover your personality traits"}
-                  </Text>
-                </View>
-                {!isAnalyzing && (
-                  <Ionicons
-                    name="arrow-forward"
-                    size={20}
-                    color="rgba(255, 255, 255, 0.8)"
-                  />
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
-
-          {analysisResult && (
-            <View style={styles.analysisContainer}>
-              <Text style={styles.analysisTitle}>🔍 Graphology Analysis:</Text>
-              <Text style={styles.analysisText}>{analysisResult}</Text>
-            </View>
-          )}
-
           <View style={styles.tips}>
             <Text style={styles.tipsTitle}>
               Tips for best handwriting analysis:
             </Text>
+            <Text style={styles.tipText}>• 3-4 lines of cursive text</Text>
             <Text style={styles.tipText}>
-              • Write naturally with a pen or pencil (avoid typing)
+              • Something meaningful (quote, thought, etc.)
             </Text>
             <Text style={styles.tipText}>
-              • Use good lighting and clear background
+              • Good lighting and clear background
             </Text>
-            <Text style={styles.tipText}>
-              • Include at least 3-4 lines of cursive text
-            </Text>
-            <Text style={styles.tipText}>
-              • Write on unlined paper for best results
-            </Text>
-            <Text style={styles.tipText}>
-              • Include your signature if possible
-            </Text>
+            <Text style={styles.tipText}>• Add your signature if possible</Text>
           </View>
-        </ScrollView>
+        </View>
       </SafeAreaView>
     </GradientBackground>
   )
@@ -387,30 +353,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    paddingTop: 10,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#ffffff",
   },
   content: {
     padding: 20,
+    paddingTop: 0,
     paddingBottom: 120, // Extra padding for bottom tab navigation
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 30,
-    marginTop: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#ffffff",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
-    lineHeight: 22,
   },
   imageContainer: {
     position: "relative",
@@ -488,25 +446,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255, 255, 255, 0.85)",
     fontWeight: "500",
-  },
-  analysisContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    marginBottom: 30,
-  },
-  analysisTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 12,
-  },
-  analysisText: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-    lineHeight: 20,
   },
   tips: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -590,5 +529,36 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.7)",
     marginLeft: 4,
     fontWeight: "500",
+  },
+  analyzeButtonCompact: {
+    position: "absolute",
+    bottom: 16,
+    right: 16,
+    backgroundColor: "#10B981",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: "#10B981",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  analyzingButtonCompact: {
+    backgroundColor: "#6B7280",
+    shadowColor: "#6B7280",
+  },
+  analyzeButtonCompactContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  analyzeButtonCompactText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#ffffff",
+    marginLeft: 6,
   },
 })

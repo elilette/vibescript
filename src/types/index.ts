@@ -54,7 +54,6 @@ export interface PersonalityVibe {
 export type TabParamList = {
   Settings: undefined
   Upload: undefined
-  Analysis: undefined
   Journal: undefined
-  Profile: undefined
+  Personality: undefined
 }

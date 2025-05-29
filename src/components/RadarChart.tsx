@@ -1,11 +1,20 @@
 import React from "react"
-import { View, StyleSheet, Dimensions } from "react-native"
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  Text,
+} from "react-native"
 import Svg, { Polygon, Circle, Line, Text as SvgText } from "react-native-svg"
 import { PersonalityTraits } from "../types/analysis"
 
 interface RadarChartProps {
   traits: PersonalityTraits
   size?: number
+  onTraitSelect?: (traitKey: keyof PersonalityTraits) => void
+  onCenterTap?: () => void
+  selectedTrait?: keyof PersonalityTraits | null
 }
 
 const traitLabels = {
@@ -30,7 +39,13 @@ const traitColors = {
   IND: "#A3E635",
 }
 
-export default function RadarChart({ traits, size }: RadarChartProps) {
+export default function RadarChart({
+  traits,
+  size,
+  onTraitSelect,
+  onCenterTap,
+  selectedTrait,
+}: RadarChartProps) {
   // Make it responsive if no size is provided
   const screenWidth = Dimensions.get("window").width
   const defaultSize = Math.min(screenWidth - 80, 350) // 40px padding on each side, max 350px
@@ -77,6 +92,7 @@ export default function RadarChart({ traits, size }: RadarChartProps) {
       label: traitLabels[key],
       value: Math.round(traits[key] * 100),
       color: traitColors[key],
+      key: key,
     }
   })
 
@@ -135,39 +151,73 @@ export default function RadarChart({ traits, size }: RadarChartProps) {
             fill={traitColors[traitKeys[index]]}
           />
         ))}
-
-        {/* Trait labels with individual colors */}
-        {labelPositions.map((pos, index) => (
-          <SvgText
-            key={`label-${index}`}
-            x={pos.x}
-            y={pos.y}
-            fontSize={labelFontSize}
-            fill={pos.color}
-            textAnchor="middle"
-            alignmentBaseline="middle"
-            fontWeight="600"
-          >
-            {pos.label}
-          </SvgText>
-        ))}
-
-        {/* Percentage values with matching colors */}
-        {labelPositions.map((pos, index) => (
-          <SvgText
-            key={`value-${index}`}
-            x={pos.x}
-            y={pos.y + labelFontSize + 4}
-            fontSize={valueFontSize}
-            fill={pos.color}
-            textAnchor="middle"
-            alignmentBaseline="middle"
-            fontWeight="500"
-          >
-            {pos.value}%
-          </SvgText>
-        ))}
       </Svg>
+
+      {/* Tappable center circle */}
+      <TouchableOpacity
+        style={[
+          styles.centerTouchArea,
+          {
+            position: "absolute",
+            left: center - 40,
+            top: center - 40,
+            width: 80,
+            height: 80,
+          },
+        ]}
+        onPress={onCenterTap}
+      />
+
+      {/* Tappable trait labels positioned absolutely */}
+      {labelPositions.map((pos, index) => {
+        const isSelected = selectedTrait === pos.key
+        return (
+          <TouchableOpacity
+            key={`label-touch-${index}`}
+            style={[
+              styles.labelContainer,
+              {
+                position: "absolute",
+                left: pos.x - 30,
+                top: pos.y - 20,
+                backgroundColor: isSelected
+                  ? "rgba(255, 255, 255, 0.2)"
+                  : "transparent",
+                borderRadius: 8,
+                padding: 4,
+              },
+            ]}
+            onPress={() => onTraitSelect?.(pos.key)}
+          >
+            <View style={styles.labelContent}>
+              <Text
+                style={[
+                  styles.labelText,
+                  {
+                    fontSize: labelFontSize,
+                    color: pos.color,
+                    fontWeight: isSelected ? "bold" : "600",
+                  },
+                ]}
+              >
+                {pos.label}
+              </Text>
+              <Text
+                style={[
+                  styles.valueText,
+                  {
+                    fontSize: valueFontSize,
+                    color: pos.color,
+                    fontWeight: isSelected ? "bold" : "500",
+                  },
+                ]}
+              >
+                {pos.value}%
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )
+      })}
     </View>
   )
 }
@@ -176,5 +226,27 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  centerTouchArea: {
+    borderRadius: 40,
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  labelContainer: {
+    width: 60,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  labelContent: {
+    alignItems: "center",
+  },
+  labelText: {
+    textAlign: "center",
+  },
+  valueText: {
+    textAlign: "center",
   },
 })
